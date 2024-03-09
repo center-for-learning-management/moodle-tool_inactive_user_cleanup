@@ -57,13 +57,27 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
             $messagetext = html_to_text($body);
             $mainadminuser = get_admin();
             foreach ($users as $usersdetails) {
+                // nur benutzer OHNE schulzurodnung sollen gelöscht werden
+                $memberships = $DB->get_records('local_eduvidual_orgid_userid', array('userid' => $usersdetails->id));
+                if ($memberships) {
+                    continue;
+                }
+
                 $minus = round((time() - $usersdetails->lastaccess) / 60 / 60 / 24);
                 if ($minus > $inactivity) {
                     $ischeck = $DB->get_record('tool_inactive_user_cleanup', array('userid' => $usersdetails->id));
                     if (!$ischeck &&  $usersdetails->lastaccess != 0) {
                         $record = new \stdClass();
                         $record->userid = $usersdetails->id;
-                        if (email_to_user($usersdetails, $mainadminuser, $subject, $messagetext)) {
+
+                        // E-Mail-Adressen mit der Domain @doesnotexist.eduvidual.at bzw. @a.eduvidual.at sollen kein E-Mail erhalten, da diese E-Mail-Adressen nicht existieren.
+                        if (preg_match('/@doesnotexist\.eduvidual\.at|@a\.eduvidual\.at$/', $usersdetails->email)) {
+                            $email_sent = true;
+                        } else {
+                            $email_sent = email_to_user($usersdetails, $mainadminuser, $subject, $messagetext);
+                        }
+
+                        if ($email_sent) {
                             mtrace(get_string('userid','tool_inactive_user_cleanup'));
                             mtrace($usersdetails->id. '---' .$usersdetails->email);
                             mtrace(get_string('userinactivtime','tool_inactive_user_cleanup') . $minus);
@@ -92,7 +106,7 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
         }else{
             mtrace(get_string('invalaliddayofinactivity','tool_inactive_user_cleanup'));
         }
-        
+
 
         mtrace(get_string('taskend','tool_inactive_user_cleanup'));
     }//end of function execute()
