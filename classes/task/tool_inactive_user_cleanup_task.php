@@ -79,6 +79,10 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
             // E-Mail-Adressen mit der Domain @doesnotexist.eduvidual.at bzw. @a.eduvidual.at sollen kein E-Mail erhalten, da diese E-Mail-Adressen nicht existieren.
             if (preg_match('/@doesnotexist\.eduvidual\.at|@a\.eduvidual\.at$/', $usersdetails->email)) {
                 $skip_email = true;
+            } elseif ($usersdetails->suspended) {
+                // suspended user sollen auch kein Email erhalten
+                // https://github.com/center-for-learning-management/eduvidual-src/issues/726#issuecomment-2287015849
+                $skip_email = true;
             } else {
                 $skip_email = false;
             }
