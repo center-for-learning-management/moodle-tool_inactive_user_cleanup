@@ -60,9 +60,14 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
         $messagetext = html_to_text($body);
         $mainadminuser = get_admin();
         foreach ($users as $usersdetails) {
-            // nur benutzer OHNE schulzurodnung sollen gelöscht werden
+            // nur benutzer OHNE schulzurodnung sollen gelÃ¶scht werden
             $memberships = $DB->get_records('local_eduvidual_orgid_userid', array('userid' => $usersdetails->id));
             if ($memberships) {
+                continue;
+            }
+
+            if (isguestuser($usersdetails)) {
+                // skip guest user
                 continue;
             }
 
