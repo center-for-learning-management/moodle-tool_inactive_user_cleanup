@@ -71,7 +71,7 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
                 continue;
             }
 
-            $minus = round((time() - $usersdetails->lastaccess) / 60 / 60 / 24);
+            $minus = round((time() - max($usersdetails->lastaccess, $usersdetails->timecreated)) / 60 / 60 / 24);
             $ischeck = $DB->get_record('tool_inactive_user_cleanup', ['userid' => $usersdetails->id]);
             $record = new \stdClass();
             $record->userid = $usersdetails->id;
@@ -87,7 +87,16 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
                 $skip_email = false;
             }
 
-            if ($minus > $inactivity && !$ischeck && $usersdetails->lastaccess != 0 && ($skip_email || email_to_user($usersdetails, $mainadminuser, $subject, $messagetext))) {
+            if ($minus > $inactivity && !$ischeck) {
+                if ($skip_email) {
+                    mtrace('sending email skipped');
+                } elseif (email_to_user($usersdetails, $mainadminuser, $subject, $messagetext)) {
+                    mtrace('email sent');
+                } else {
+                    mtrace('sending email failed');
+                    continue;
+                }
+
                 mtrace(get_string('userid', 'tool_inactive_user_cleanup'));
                 mtrace($usersdetails->id. '---' .$usersdetails->email);
                 mtrace(get_string('userinactivtime', 'tool_inactive_user_cleanup') . $minus);
@@ -96,6 +105,7 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
                 $record->date = time();
                 $DB->insert_record('tool_inactive_user_cleanup', $record, false);
             }
+
             if ($beforedelete != 0 &&  $usersdetails->lastaccess != 0) {
                 $deleteuserafternotify = $DB->get_record('tool_inactive_user_cleanup', ['userid' => $usersdetails->id]);
                 if($deleteuserafternotify) {
