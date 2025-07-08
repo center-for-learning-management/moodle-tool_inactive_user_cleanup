@@ -59,6 +59,7 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
         $users = $DB->get_records('user', ['deleted' => '0']);
         $messagetext = html_to_text($body);
         $mainadminuser = get_admin();
+        $email_cnt = 0;
         foreach ($users as $usersdetails) {
             // nur benutzer OHNE schulzurodnung sollen gelöscht werden
             $memberships = $DB->get_records('local_eduvidual_orgid_userid', array('userid' => $usersdetails->id));
@@ -88,33 +89,41 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
             }
 
             if ($minus > $inactivity && !$ischeck) {
+                mtrace(get_string('userid', 'tool_inactive_user_cleanup'));
+                mtrace($usersdetails->id . '---' . $usersdetails->email);
+                mtrace(get_string('userinactivtime', 'tool_inactive_user_cleanup') . ' ' . $minus);
+
                 if ($skip_email) {
                     mtrace('sending email skipped');
                 } elseif (email_to_user($usersdetails, $mainadminuser, $subject, $messagetext)) {
+                    $email_cnt++;
                     mtrace('email sent');
                 } else {
                     mtrace('sending email failed');
                     continue;
                 }
 
-                mtrace(get_string('userid', 'tool_inactive_user_cleanup'));
-                mtrace($usersdetails->id. '---' .$usersdetails->email);
-                mtrace(get_string('userinactivtime', 'tool_inactive_user_cleanup') . $minus);
-                mtrace('');
                 $record->emailsent = 1;
                 $record->date = time();
                 $DB->insert_record('tool_inactive_user_cleanup', $record, false);
+
+                if ($email_cnt >= 500) {
+                    mtrace('stop sending more emails, limit reached');
+                    break;
+                }
+
+                continue;
             }
 
-            if ($beforedelete != 0 &&  $usersdetails->lastaccess != 0) {
+            if ($beforedelete != 0 && $usersdetails->lastaccess != 0) {
                 $deleteuserafternotify = $DB->get_record('tool_inactive_user_cleanup', ['userid' => $usersdetails->id]);
-                if($deleteuserafternotify) {
+                if ($deleteuserafternotify) {
                     $beforedelete = get_config('tool_inactive_user_cleanup', 'daysbeforedeletion');
                     $mailssent = $deleteuserafternotify->date;
                     $diff = round((time() - $mailssent) / 60 / 60 / 24);
                     if (!empty($deleteuserafternotify) && $diff > $beforedelete && !isguestuser($usersdetails->id)) {
                         delete_user($usersdetails);
-                        mtrace(get_string('deleteduser', 'tool_inactive_user_cleanup') . $usersdetails->id);
+                        mtrace(get_string('deleteduser', 'tool_inactive_user_cleanup') . ' ', $usersdetails->id);
                         mtrace(get_string('detetsuccess', 'tool_inactive_user_cleanup'));
                     }
                 }
