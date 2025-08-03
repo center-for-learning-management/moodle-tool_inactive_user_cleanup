@@ -77,6 +77,15 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
             $record = new \stdClass();
             $record->userid = $usersdetails->id;
 
+            if ($minus <= $inactivity) {
+                // User is still active, skip deleting
+                if ($ischeck) {
+                    // delete cleanup record
+                    $DB->delete_records('tool_inactive_user_cleanup', ['userid' => $usersdetails->id]);
+                }
+                continue;
+            }
+
             // E-Mail-Adressen mit der Domain @doesnotexist.eduvidual.at bzw. @a.eduvidual.at sollen kein E-Mail erhalten, da diese E-Mail-Adressen nicht existieren.
             if (preg_match('/@doesnotexist\.eduvidual\.at|@a\.eduvidual\.at$/', $usersdetails->email)) {
                 $skip_email = true;
@@ -88,7 +97,7 @@ class tool_inactive_user_cleanup_task extends \core\task\scheduled_task {
                 $skip_email = false;
             }
 
-            if ($minus > $inactivity && !$ischeck) {
+            if (!$ischeck) {
                 mtrace(get_string('userid', 'tool_inactive_user_cleanup'));
                 mtrace($usersdetails->id . '---' . $usersdetails->email);
                 mtrace(get_string('userinactivtime', 'tool_inactive_user_cleanup') . ' ' . $minus);
